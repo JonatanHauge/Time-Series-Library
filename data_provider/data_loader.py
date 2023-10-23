@@ -1,5 +1,10 @@
+import sys
+# caution: path[0] is reserved for script path (or '' in REPL)
+sys.path.insert(1, "C:/Users/johau/Desktop/Weel & Sandvig/ML/Time-Series-Library")
+
+
 import os
-import numpy as np
+import numpy as np  
 import pandas as pd
 import glob
 import re
@@ -308,6 +313,9 @@ class Dataset_M4(Dataset):
         self.seq_len = size[0]
         self.label_len = size[1]
         self.pred_len = size[2]
+
+        print('seq_len, label_len, pred_len: ')
+        print(self.seq_len, self.label_len, self.pred_len)
 
         self.seasonal_patterns = seasonal_patterns
         self.history_size = M4Meta.history_size[seasonal_patterns]
