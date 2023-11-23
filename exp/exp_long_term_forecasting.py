@@ -9,6 +9,7 @@ import os
 import time
 import warnings
 import numpy as np
+import pandas as pd
 
 warnings.filterwarnings('ignore')
 
@@ -24,6 +25,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
         return model
 
+    def _get_target_idx(self):
+        df_tmp = pd.read_csv(self.args.data_path)
+        df_data_tmp = df_tmp.drop(self.args.remove_cols, axis = 1).iloc[:,1:]
+        if self.args.target == 'All':
+            target_idx = None
+        else:
+            target_idx = df_data_tmp.columns.get_loc(self.args.target)
+        return target_idx
+
     def _get_data(self, flag):
         data_set, data_loader = data_provider(self.args, flag)
         return data_set, data_loader
@@ -37,6 +47,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return criterion
 
     def vali(self, vali_data, vali_loader, criterion):
+        target_idx = self._get_target_idx()
         total_loss = []
         self.model.eval()
         with torch.no_grad():
@@ -62,13 +73,16 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+
+                if self.args.target == 'All':
+                    outputs = outputs[:, -self.args.pred_len:, :]
+                    batch_y = batch_y[:, -self.args.pred_len:, :].to(self.device)
+                else:
+                    outputs = outputs[:, -self.args.pred_len:, target_idx]
+                    batch_y = batch_y[:, -self.args.pred_len:, target_idx].to(self.device)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
-
                 loss = criterion(pred, true)
 
                 total_loss.append(loss)
@@ -80,6 +94,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
+        target_idx = self._get_target_idx()
 
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
@@ -134,11 +149,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                    f_dim = -1 if self.args.features == 'MS' else 0
-                    outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                    batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
-                    loss = criterion(outputs, batch_y)
-                    train_loss.append(loss.item())
+                if self.args.target == 'All':
+                    outputs = outputs[:, -self.args.pred_len:, :]
+                    batch_y = batch_y[:, -self.args.pred_len:, :].to(self.device)
+                else:
+                    outputs = outputs[:, -self.args.pred_len:, target_idx]
+                    batch_y = batch_y[:, -self.args.pred_len:, target_idx].to(self.device)
+
+                loss = criterion(outputs, batch_y)
+                train_loss.append(loss.item())
 
                 if (i + 1) % 100 == 0:
                     print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
@@ -177,6 +196,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
     def test(self, setting, test=0):
         test_data, test_loader = self._get_data(flag='test')
+        target_idx = self._get_target_idx()
         if test:
             print('loading model')
             self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
@@ -213,29 +233,39 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     else:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                f_dim = -1 if self.args.features == 'MS' else 0
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                outputs = outputs[:, -self.args.pred_len:, :]
+                batch_y = batch_y[:, -self.args.pred_len:, :].to(self.device)    
                 outputs = outputs.detach().cpu().numpy()
                 batch_y = batch_y.detach().cpu().numpy()
+
                 if test_data.scale and self.args.inverse:
                     shape = outputs.shape
                     outputs = test_data.inverse_transform(outputs.squeeze(0)).reshape(shape)
                     batch_y = test_data.inverse_transform(batch_y.squeeze(0)).reshape(shape)
+
+                if self.args.target != 'All':
+                    outputs = outputs[:, :, target_idx]
+                    batch_y = batch_y[:, :, target_idx]
+
+                if i == 0:
+                    print('Test scale', test_data.scale)
+                    print('inverse scale', self.args.inverse)
 
                 pred = outputs
                 true = batch_y
 
                 preds.append(pred)
                 trues.append(true)
-                if i % 20 == 0:
-                    input = batch_x.detach().cpu().numpy()
-                    if test_data.scale and self.args.inverse:
-                        shape = input.shape
-                        input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
-                    gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
-                    pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+                #Plotting
+                #if i % 500 == 0:
+                #    input = batch_x.detach().cpu().numpy()
+                #    if test_data.scale and self.args.inverse:
+                #        shape = input.shape
+                #        input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
+                #    for j in range(input.shape[-1]): #Save prediction plot for all attributes
+                #        gt = np.concatenate((input[0, :, j], true[0, :, j]), axis=0)
+                #        pd = np.concatenate((input[0, :, j], pred[0, :, j]), axis=0)
+                #        visual(gt, pd, os.path.join(folder_path, str(j) + 'th_att_batch' + str(i) + '.pdf'))
 
         preds = np.array(preds)
         trues = np.array(trues)

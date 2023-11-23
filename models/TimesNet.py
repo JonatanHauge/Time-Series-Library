@@ -129,6 +129,7 @@ class Model(nn.Module):
 
     def imputation(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask):
         # Normalization from Non-stationary Transformer
+        print('Mask: ', mask)
         means = torch.sum(x_enc, dim=1) / torch.sum(mask == 1, dim=1)
         means = means.unsqueeze(1).detach()
         x_enc = x_enc - means

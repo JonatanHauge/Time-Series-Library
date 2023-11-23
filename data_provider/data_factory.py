@@ -1,6 +1,8 @@
+from tkinter import Scale
 from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_M4, PSMSegLoader, \
     MSLSegLoader, SMAPSegLoader, SMDSegLoader, SWATSegLoader, UEAloader
 from data_provider.uea import collate_fn
+from exp.WS_Dataset import Dataset_WS
 from torch.utils.data import DataLoader
 
 data_dict = {
@@ -15,7 +17,8 @@ data_dict = {
     'SMAP': SMAPSegLoader,
     'SMD': SMDSegLoader,
     'SWAT': SWATSegLoader,
-    'UEA': UEAloader
+    'UEA': UEAloader,
+    'WS_AGT42': Dataset_WS
 }
 
 
@@ -44,7 +47,6 @@ def data_provider(args, flag):
             win_size=args.seq_len,
             flag=flag,
         )
-        print(flag, len(data_set))
         data_loader = DataLoader(
             data_set,
             batch_size=batch_size,
@@ -68,6 +70,24 @@ def data_provider(args, flag):
             collate_fn=lambda x: collate_fn(x, max_len=args.seq_len)
         )
         return data_set, data_loader
+    elif args.data == 'WS_AGT42':
+        data_set = Data(path = args.data_path, 
+             flag = flag, 
+             scale = args.scale, 
+             size = [args.seq_len, args.label_len, args.pred_len], 
+             remove_cols = args.remove_cols, 
+             data_cut_low = args.data_cut_low,
+             data_cut_high = args.data_cut_high)
+        
+        data_loader = DataLoader(
+            data_set,
+            batch_size=batch_size,
+            shuffle=shuffle_flag,
+            num_workers=args.num_workers,
+            drop_last=drop_last)
+        
+        return data_set, data_loader
+            
     else:
         if args.data == 'm4':
             drop_last = False

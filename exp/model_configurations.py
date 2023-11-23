@@ -1,17 +1,18 @@
-
+    
 
 
 class ModelConfig:
     def __init__(self, task_name = 'long_term_forecast', is_training = True, model_id = 'test', model = 'Autoformer',
-                 data = 'm4', root_path = r"C:\Users\johau\Desktop\Weel & Sandvig\ML\Time-Series-Library\dataset\m4",
-                 data_path = 'Daily-train.csv', features = 'M', target = 'OT', freq = 'h', checkpoints = './checkpoints/',
+                 data = 'weather', root_path = r"C:\Users\johau\Desktop\Weel & Sandvig\ML\Time-Series-Library\dataset\weather\weather",
+                 data_path = 'weather.csv', features = 'M', freq = 'h', checkpoints = './checkpoints/',
                  seq_len = 96, label_len = 48, pred_len = 96, seasonal_patterns = 'Monthly', inverse = False, mask_rate = 0.25,
                  anomaly_ratio = 0.25, top_k = 5, num_kernels = 6, enc_in=7, dec_in = 7, c_out=7, d_model=512, n_heads = 8,
                 e_layers = 2, d_layers = 1, d_ff=2048, moving_avg=25, factor = 1, distil= True, dropout = 0.1, embed='timeF',
                 activation = 'gelu', output_attention = False, num_workers = 10, itr = 1, train_epochs = 10, batch_size=32,
                 patience = 3, learning_rate = 0.0001, des = 'test', loss = 'MSE', lradj = 'type1', use_amp = False,
                 use_gpu = False, gpu = 0, use_multi_gpu = False, devices = '0,1,2,3', p_hidden_dims = [128,128],
-                p_hidden_layers = 2, setting = 0):
+                p_hidden_layers = 2, setting = 0, remove_cols = [None], scale = False, data_cut_low = 0, data_cut_high = 10000,
+                target = 'All'):
         
         # basic config
         self.task_name = task_name
@@ -23,10 +24,13 @@ class ModelConfig:
         self.data = data
         self.root_path = root_path
         self.data_path = data_path
+        self.remove_cols = remove_cols
         self.features = features
-        self.target = target
         self.freq = freq
         self.checkpoints = checkpoints
+        self.scale = scale
+        self.data_cut_low = data_cut_low
+        self.data_cut_high = data_cut_high
 
         # forecasting task
         self.seq_len = seq_len
@@ -34,6 +38,7 @@ class ModelConfig:
         self.pred_len = pred_len
         self.seasonal_patterns = seasonal_patterns
         self.inverse = inverse
+        self.target = target
 
         # inputation task
         self.mask_rate = mask_rate
@@ -86,7 +91,7 @@ class ModelConfig:
         self.p_hidden_layers = p_hidden_layers
 
 
-        #Virker muligvis ikke som ønsket...
+        
         self.setting = 0
         if self.is_training:
             for ii in range(self.itr):
